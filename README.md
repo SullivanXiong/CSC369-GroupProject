@@ -1,9 +1,9 @@
 # CSC369-GroupProject
 
 # Team
-*Zachary Silver
-*Steven Sun
-*Sullivan Xiong
+* Zachary Silver
+* Steven Sun
+* Sullivan Xiong
 
 # Tech
 Scala/Spark
