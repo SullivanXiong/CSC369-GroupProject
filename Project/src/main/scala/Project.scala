@@ -229,7 +229,7 @@ object project {
       Array(query),
       k)
     println(s"K value: $k")
-    println(s"Predicted percentage of population vaccinated: $prediction")
+    println(s"Predicted percentage of population vaccinated: $prediction\n")
 
 
     //predicting the closest percent of full vaccinations based on query population
@@ -239,8 +239,7 @@ object project {
       Array(query3),
       k
     )
-    println(s"K value: $k")
-    println(s"Predicted percentage of state population vaccinated: $state_prediction")
+    println(s"Predicted percentage of state population vaccinated: $state_prediction\n")
 
     /* Approximate vaccination percentage of the entire world */
     val population_sum = locations.map(location => location._2.population).sum
