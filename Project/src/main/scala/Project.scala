@@ -117,8 +117,8 @@ object project {
   }
 
   def main(args: Array[String]): Unit = {
-    if (args.length != 5) {
-      println("Usage: App [vaccinationsFile] [covidFile] [queryFile] [populationsFile] [queryFile2]")
+    if (args.length != 6) {
+      println("Usage: App [vaccinationsFile] [covidFile] [queryFile] [populationsFile] [queryFile2] [queryFile3]")
       return
     }
     System.setProperty("hadoop.home.dir", "c:/winutils/")
@@ -185,6 +185,7 @@ object project {
     val covidReports = sc.textFile(args(1))
       .map(CovidReport.parse)
       .zipWithIndex().map(report => (report._2, report._1))
+      .persist()
 
     // A (latitude, longitude) query
     val query2 = sc.textFile(args(4))
@@ -201,5 +202,19 @@ object project {
     )
 
     println(s"Predicted case fatality ratio: $result_case_fatality_rate\n")
+
+    /* Query3 Recovery prediction given active number of covid cases */
+    val query3 = sc.textFile(args(5))
+      .map(_.trim.toLong)
+      .take(1)(0)
+
+    val predictionQuery3 = knn(
+      covidReports.map(report => (report._1, Array(report._2.active))),
+      covidReports.map(report => (report._1, Array((report._2.recovered.toDouble / report._2.cases.toDouble) * 100))),
+      Array(query3),
+      k
+    )
+
+    println(s"Predicted recovery rate given active cases amount: $predictionQuery3\n")
   }
 }
