@@ -97,23 +97,24 @@ object VaccinationReport {
 object project {
   // This is how we calculate the euclidean distance between two feature vectors.
   // It's the standard distance formula applied across corresponding features in both vectors.
-  def euclideanDistance(a: Array[Double], b: Array[Double]): Double = {
+  def euclideanDistance(a: Array[Long], b: Array[Double]): Double = {
     Math.sqrt(a.zip(b).map({ case (x, y) => Math.pow(x - y, 2) }).sum)
   }
 
   // A simple explanation of how K-Nearest Neighbors works can be found at:
   // https://towardsdatascience.com/machine-learning-basics-with-the-k-nearest-neighbors-algorithm-6a6e71d01761
-  def knn(data: RDD[(Long, Array[Double])], labels: RDD[(Long, Array[Double])], query: Array[Double], k: Int): Double = {
-    val nearestNeighbors = data.map(line => {
-      (line._1, euclideanDistance(line._2, query))
-    })
-      .join(labels)
-      .sortBy(_._2._1)
-      .take(k)
+  def knn(data: Array[Long], labels: Array[Double], query: Array[Double], k: Int): Double = {
+//    val nearestNeighbors = data.map(line => {
+//      (line._1, euclideanDistance(line._2, query))
+//    })
+//      .join(labels)
+//      .sortBy(_._2._1)
+//      .take(k)
+//
+//    val choice = nearestNeighbors.map(_._2._2(0)).sum / nearestNeighbors.length
+    val choice = labels.head
 
-    val choice = nearestNeighbors.map(_._2._2(0)).sum / nearestNeighbors.length
-
-    return choice
+    choice
   }
 
   def main(args: Array[String]): Unit = {
@@ -144,10 +145,14 @@ object project {
       .map(country => country._2.maxBy(_.percentVaccinated))
 
     // Retrieve populations per country from file.
-    // (country, population)
+    // (country, (population, lineNumber))
+
     val populations = sc.textFile(args(3))
       .map(line => line.split(","))
       .map(line => (line(0).trim, line(1).trim.toLong))
+      .sortBy(x => x._2 * -1)
+      .zipWithIndex
+      .map(population => (population._1._1, (population._1._2, population._2 + 1)))
 
     // Join populations and vaccinationReports on country
     // and map the results to a Location object containing only what
@@ -155,26 +160,31 @@ object project {
     // a unique id as if we were assigning a lineNumber from a file.
     // (lineNumber, Location)
     val locations = populations.join(vaccinationReports.keyBy(_.country))
-      .map(country => Location(country._1, country._2._1, country._2._2.percentVaccinated))
-      .zipWithIndex()
-      .map(country => (country._2, country._1))
+      .map(country => (country._2._1._2, Location(country._1, country._2._1._1, country._2._2.percentVaccinated))).collect()
 
     // The query file should contain a single integer representing the
     // desired population the predict.
     // (population)
-//    val query = sc.textFile(args(2))
-//      .map(_.trim.toLong)
-//      .take(1)(0)
-    locations.foreach(x=>{println(x._1);println("percent: "+x._2.percentVaccinated+" "+
-    )})
-//    val prediction = knn(
-//      locations.map(location => (location._1, Array(location._2.population))),
-//      locations.map(location => (location._1, Array(location._2.percentVaccinated))),
-//      Array(query),
-//      k
-//    )
+    val query = sc.textFile(args(2))
+      .map(_.trim.toLong)
+      .take(1)(0)
 
-//    println(s"K value: $k")
-//    println(s"Predicted percentage of population vaccinated: $prediction")
+    val prediction = knn(
+      locations.filter(location => location._1 == query)
+               .map(location => Array(location._2.population)).head,
+      locations.filter(location => location._1 == query)
+               .map(location => Array(location._2.percentVaccinated)).head,
+      Array(query),
+      k
+    )
+
+    println(s"K value: $k")
+    println(s"Predicted percentage of population vaccinated: $prediction")
+
+    val population_sum = locations.map(location => location._2.population).sum
+    val entire_world_prediction = locations.map(location => location._2.percentVaccinated * (location._2.population.toDouble / population_sum)).sum
+    println("Predicted percentage of world vaccinated: %.2f".format(entire_world_prediction))
+
+
   }
 }
