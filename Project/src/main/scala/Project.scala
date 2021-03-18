@@ -147,7 +147,7 @@ object project {
 
     // Square root of N is often chosen as a good value for K in practice
     //val k = Math.sqrt(populations.count()).toInt
-    val kQuery1 = Math.sqrt(populations.count()).toInt
+    val k = 3
 
     // Join populations and vaccinationReports on country
     // and map the results to a Location object containing only what
@@ -170,10 +170,10 @@ object project {
       locations.map(location => (location._1, Array(location._2.population))),
       locations.map(location => (location._1, Array(location._2.percentVaccinated))),
       Array(query),
-      kQuery1
+      k
     )
 
-    println(s"K value: $kQuery1")
+    println(s"K value: $k")
     println(s"Predicted percentage of population vaccinated: $prediction\n")
 
     /* Approximate vaccination percentage of the entire world */
@@ -192,16 +192,14 @@ object project {
       .map(line => (line(0).toDouble, line(1).toDouble))
       .take(1)(0)
 
-    val kQuery2 = Math.sqrt(covidReports.count()).toInt
     // We just send latitude and longitude as the data and caseFatalityRatio
     val result_case_fatality_rate = knn(
       covidReports.map(report => (report._1, Array(report._2.latitude, report._2.longitude))),
       covidReports.map(report => (report._1, Array(report._2.caseFatalityRatio))),
       Array(query2._1, query2._2),
-      kQuery2
+      k
     )
 
-    println(s"K value: $kQuery2")
     println(s"Predicted case fatality ratio: $result_case_fatality_rate\n")
   }
 }
