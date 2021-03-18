@@ -117,8 +117,8 @@ object project {
   }
 
   def main(args: Array[String]): Unit = {
-    if (args.length != 4) {
-      println("Usage: App [vaccinationsFile] [covidFile] [queryFile] [populationsFile]")
+    if (args.length != 5) {
+      println("Usage: App [vaccinationsFile] [covidFile] [queryFile] [populationsFile] [queryFile2]")
       return
     }
     System.setProperty("hadoop.home.dir", "c:/winutils/")
@@ -127,10 +127,6 @@ object project {
 
     val conf = new SparkConf().setAppName("project").setMaster("local[4]")
     val sc = new SparkContext(conf)
-
-    // Square root of N is often chosen as a good value for K in practice
-    //val k = Math.sqrt(covidReports.count()).toInt
-    val k = 3
 
     // There are multiple reports per country, one per day.
     // If we want to predict what percentage of the population
@@ -148,6 +144,10 @@ object project {
     val populations = sc.textFile(args(3))
       .map(line => line.split(","))
       .map(line => (line(0).trim, line(1).trim.toLong))
+
+    // Square root of N is often chosen as a good value for K in practice
+    //val k = Math.sqrt(populations.count()).toInt
+    val kQuery1 = Math.sqrt(populations.count()).toInt
 
     // Join populations and vaccinationReports on country
     // and map the results to a Location object containing only what
@@ -170,14 +170,38 @@ object project {
       locations.map(location => (location._1, Array(location._2.population))),
       locations.map(location => (location._1, Array(location._2.percentVaccinated))),
       Array(query),
-      k
+      kQuery1
     )
 
-    println(s"K value: $k")
-    println(s"Predicted percentage of population vaccinated: $prediction")
+    println(s"K value: $kQuery1")
+    println(s"Predicted percentage of population vaccinated: $prediction\n")
 
+    /* Approximate vaccination percentage of the entire world */
     val population_sum = locations.map(location => location._2.population).sum
     val entire_world_prediction = locations.map(location => location._2.percentVaccinated * (location._2.population.toDouble / population_sum)).sum
-    println("Approximate percentage of the entire world vaccinated: %.2f".format(entire_world_prediction))
+    println("Approximate percentage of the entire world vaccinated: %.2f\n".format(entire_world_prediction))
+
+    /* Query2 Case Fatality Rate for given longitude and latitude */
+    val covidReports = sc.textFile(args(1))
+      .map(CovidReport.parse)
+      .zipWithIndex().map(report => (report._2, report._1))
+
+    // A (latitude, longitude) query
+    val query2 = sc.textFile(args(4))
+      .map(line => line.split(", "))
+      .map(line => (line(0).toDouble, line(1).toDouble))
+      .take(1)(0)
+
+    val kQuery2 = Math.sqrt(covidReports.count()).toInt
+    // We just send latitude and longitude as the data and caseFatalityRatio
+    val result_case_fatality_rate = knn(
+      covidReports.map(report => (report._1, Array(report._2.latitude, report._2.longitude))),
+      covidReports.map(report => (report._1, Array(report._2.caseFatalityRatio))),
+      Array(query2._1, query2._2),
+      kQuery2
+    )
+
+    println(s"K value: $kQuery2")
+    println(s"Predicted case fatality ratio: $result_case_fatality_rate\n")
   }
 }
