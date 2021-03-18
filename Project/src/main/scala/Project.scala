@@ -154,9 +154,9 @@ object project {
   }
 
   def main(args: Array[String]): Unit = {
-    if (args.length != 7) {
+    if (args.length != 8) {
       println("Usage: App [vaccinationsFile] [covidFile] [queryFile] " +
-        "[populationsFile] [queryFile2] [StateVaccinationsFile] [statePopulationFile]")
+        "[populationsFile] [queryFile2] [StateVaccinationsFile] [statePopulationFile] [queryFile3]")
 
       return
     }
@@ -219,7 +219,10 @@ object project {
     val query = sc.textFile(args(2))
       .map(_.trim.toLong)
       .take(1)(0)
-
+    
+    val query3 = sc.textFile(args(7))
+      .map(_.trim.toLong)
+      .take(1)(0)
 
     val prediction = knn(
       locations.map(location => (location._1, Array(location._2.population))),
@@ -234,7 +237,7 @@ object project {
     val state_prediction = knn(
       stateVaccinations.map(state=>(state._3,Array(state._3.toDouble))),
       stateVaccinations.map(state=>(state._3,Array(state._5.toDouble))),
-      Array(1068778,1068778),
+      Array(query3),
       k
     )
     println(s"K value: $k")
