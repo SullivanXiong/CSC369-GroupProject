@@ -94,6 +94,43 @@ object VaccinationReport {
   }
 }
 
+case class StateVaccinationReport(date: String,
+                                  stateName:String,
+                                  total_vaccinations:Long,
+                                  total_distributed:Long,
+                                  people_fully_vaccinated:Long)
+object StateVaccinationReport {
+  def toDouble(s: String):Option[Double] = {
+    try {
+      Some(s.toDouble)
+    } catch {
+      case e: NumberFormatException => None
+    }
+  }
+  def toLong(s: String):Option[Long] = {
+    try {
+      Some(s.toLong)
+    } catch {
+      case e: NumberFormatException => None
+    }
+  }
+
+  def parse(line: String): StateVaccinationReport = {
+    // This gross regex is necessary to parse the csv properly
+    val values = line.split(",(?=(?:[^\"]*[\"][^\"]*[\"])*[^\"]*$)")
+
+    // Some values are completely absent from the csv or empty
+    // so we have additional logic to handle those cases safely
+
+    StateVaccinationReport(
+      date = values(0).trim,
+      stateName = values(1).trim,
+      total_vaccinations = toLong(values(2).trim).getOrElse(0),
+      total_distributed = toLong(values(3).trim).getOrElse(0),
+      people_fully_vaccinated = toLong(values(5).trim).getOrElse(0)
+    )
+  }
+}
 object project {
   // This is how we calculate the euclidean distance between two feature vectors.
   // It's the standard distance formula applied across corresponding features in both vectors.
@@ -113,12 +150,13 @@ object project {
 
     val choice = nearestNeighbors.map(_._2._2(0)).sum / nearestNeighbors.length
 
-    choice
+    return choice
   }
 
   def main(args: Array[String]): Unit = {
-    if (args.length != 6) {
-      println("Usage: App [vaccinationsFile] [covidFile] [queryFile] [populationsFile] [queryFile2] [queryFile3]")
+    if (args.length != 9) {
+      println("Usage: App [vaccinationsFile] [covidFile] [queryFile] " +
+        "[populationsFile] [queryFile2] [StateVaccinationsFile] [statePopulationFile] [queryFile3] [queryFile4]")
       return
     }
     System.setProperty("hadoop.home.dir", "c:/winutils/")
@@ -127,6 +165,24 @@ object project {
 
     val conf = new SparkConf().setAppName("project").setMaster("local[4]")
     val sc = new SparkContext(conf)
+
+
+    // Square root of N is often chosen as a good value for K in practice
+    //val k = Math.sqrt(covidReports.count()).toInt
+    val k = 3
+
+    //get the most recently vaccinations report for each state/government agency
+    val stateVaccinationReports = sc.textFile(args(5))
+      .map(StateVaccinationReport.parse)
+      .groupBy(_.stateName)
+      .map(state => state._2.maxBy(_.total_vaccinations))
+
+    val stateVaccinations = sc.textFile(args(6))
+      .map(line => line.split(","))
+      .map(line => (line(0).trim, line(1).trim.toLong))
+      .join(stateVaccinationReports.keyBy(_.stateName))
+      .map(state => (state._1,state._2._2.total_vaccinations,state._2._1,
+        state._2._2.total_distributed,state._2._2.people_fully_vaccinated * 1.0/state._2._1))
 
     // There are multiple reports per country, one per day.
     // If we want to predict what percentage of the population
@@ -145,9 +201,6 @@ object project {
       .map(line => line.split(","))
       .map(line => (line(0).trim, line(1).trim.toLong))
 
-    // Square root of N is often chosen as a good value for K in practice
-    //val k = Math.sqrt(populations.count()).toInt
-    val k = 3
 
     // Join populations and vaccinationReports on country
     // and map the results to a Location object containing only what
@@ -165,16 +218,29 @@ object project {
     val query = sc.textFile(args(2))
       .map(_.trim.toLong)
       .take(1)(0)
+    
+    val query3 = sc.textFile(args(7))
+      .map(_.trim.toLong)
+      .take(1)(0)
 
     val prediction = knn(
       locations.map(location => (location._1, Array(location._2.population))),
       locations.map(location => (location._1, Array(location._2.percentVaccinated))),
       Array(query),
+      k)
+    println(s"K value: $k")
+    println(s"Predicted percentage of population vaccinated: $prediction")
+
+
+    //predicting the closest percent of full vaccinations based on query population
+    val state_prediction = knn(
+      stateVaccinations.map(state=>(state._3,Array(state._3.toDouble))),
+      stateVaccinations.map(state=>(state._3,Array(state._5.toDouble))),
+      Array(query3),
       k
     )
-
     println(s"K value: $k")
-    println(s"Predicted percentage of population vaccinated: $prediction\n")
+    println(s"Predicted percentage of state population vaccinated: $state_prediction")
 
     /* Approximate vaccination percentage of the entire world */
     val population_sum = locations.map(location => location._2.population).sum
@@ -204,14 +270,14 @@ object project {
     println(s"Predicted case fatality ratio: $result_case_fatality_rate\n")
 
     /* Query3 Recovery prediction given active number of covid cases */
-    val query3 = sc.textFile(args(5))
+    val query4 = sc.textFile(args(8))
       .map(_.trim.toLong)
       .take(1)(0)
 
     val predictionQuery3 = knn(
       covidReports.map(report => (report._1, Array(report._2.active))),
       covidReports.map(report => (report._1, Array((report._2.recovered.toDouble / report._2.cases.toDouble) * 100))),
-      Array(query3),
+      Array(query4),
       k
     )
 
