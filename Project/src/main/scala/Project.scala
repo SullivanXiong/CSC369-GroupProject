@@ -175,5 +175,9 @@ object project {
 
     println(s"K value: $k")
     println(s"Predicted percentage of population vaccinated: $prediction")
+
+    val population_sum = locations.map(location => location._2.population).sum
+    val entire_world_prediction = locations.map(location => location._2.percentVaccinated * (location._2.population.toDouble / population_sum)).sum
+    println("Predicted percentage of world vaccinated: %.2f".format(entire_world_prediction))
   }
 }
