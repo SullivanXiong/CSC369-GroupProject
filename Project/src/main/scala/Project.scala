@@ -162,18 +162,19 @@ object project {
     // The query file should contain a single integer representing the
     // desired population the predict.
     // (population)
-    val query = sc.textFile(args(2))
-      .map(_.trim.toLong)
-      .take(1)(0)
+//    val query = sc.textFile(args(2))
+//      .map(_.trim.toLong)
+//      .take(1)(0)
+    locations.foreach(x=>{println(x._1);println("percent: "+x._2.percentVaccinated+" "+
+    )})
+//    val prediction = knn(
+//      locations.map(location => (location._1, Array(location._2.population))),
+//      locations.map(location => (location._1, Array(location._2.percentVaccinated))),
+//      Array(query),
+//      k
+//    )
 
-    val prediction = knn(
-      locations.map(location => (location._1, Array(location._2.population))),
-      locations.map(location => (location._1, Array(location._2.percentVaccinated))),
-      Array(query),
-      k
-    )
-
-    println(s"K value: $k")
-    println(s"Predicted percentage of population vaccinated: $prediction")
+//    println(s"K value: $k")
+//    println(s"Predicted percentage of population vaccinated: $prediction")
   }
 }
